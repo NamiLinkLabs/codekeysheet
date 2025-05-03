@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CodeKeySheet Codes Cheat Sheet (Static JS)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+      background: #fafbfc;
+    }
+    h1 {
+      text-align: center;
+    }
+    .instructions {
+      font-size: 0.95em;
+      margin-bottom: 1.5em;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    table {
+      border-collapse: collapse;
+      margin: 0 auto 2em auto;
+      font-size: 1.1em;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #333;
+      padding: 0.5em 1.2em;
+      text-align: center;
+      min-width: 2.5em;
+    }
+    th.row-label, td.row-label {
+      background: #f0f0f0;
+      font-weight: bold;
+    }
+    th {
+      background: #e0e0e0;
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 1.5em;
+    }
+    .controls label {
+      margin: 0 0.5em;
+    }
+    .download-btn {
+      margin-top: 1em;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    @media print {
+      .controls {
+        display: none !important;
+      }
+      .totp-hint-print-hide {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>CodeKeySheet Offline Codes</h1>
+  <div class="instructions">
+    <em>This is a CodeKeySheet code sheet. The name reflects its purpose: providing proof of identity or intent, even when digital voices and faces can't be trusted.</em>
+    <br><br>
+    <strong>Privacy notice:</strong> All codes are generated <u>entirely in your browser</u> and are <u>never sent to any server</u>. There is no tracking or analytics on this website.
+    <br><br>
+    <strong>Instructions:</strong> Two people share this sheet. The recommended use is:<br>
+    <ul>
+      <li>The receiver (the person verifying) asks for a code at a position (e.g., B3).</li>
+      <li>The caller (the person being verified) reads out the <strong>first 3 letters</strong> of the code at that position.</li>
+      <li>The receiver then reads out the <strong>last 3 letters</strong> of the code at that position to confirm.</li>
+    </ul>
+    <strong>If there is any discrepancy in the code exchange, the suspecting party should immediately end the call and redial using a different channel (such as WhatsApp, Signal, etc).</strong>
+  </div>
+  <div class="controls">
+    <label>Columns: <input type="number" id="columns" value="4" min="1" max="20"></label>
+    <label>Rows: <input type="number" id="rows" value="15" min="1" max="26"></label>
+    <label>Code Length: <input type="number" id="codeLength" value="6" min="2" max="12"></label>
+    <button onclick="generateSheet()">Generate</button>
+    <button onclick="downloadAsHTML()" class="download-btn">Download as HTML</button>
+    <button onclick="window.print()" class="download-btn">Print / Save as PDF</button>
+  </div>
+
+  <div class="totp-hint-print-hide" style="text-align:center; margin-bottom:1.5em;">
+    <small>
+      Prefer a TOTP app? <a href="#" onclick="showTOTPDialog();return false;" style="text-decoration:underline;">Create TOTP Secret</a>
+    </small>
+  </div>
+
+  <div id="totpDialog" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000;">
+    <div style="background:#fff; max-width:400px; margin:10vh auto; padding:2em; border-radius:8px; box-shadow:0 2px 12px #0003; position:relative;">
+      <button onclick="closeTOTPDialog()" style="position:absolute; top:0.5em; right:0.5em; background:none; border:none; font-size:1.2em; cursor:pointer;">&times;</button>
+      <h2>Create TOTP Secret</h2>
+      <form id="totpForm" onsubmit="event.preventDefault(); generateTOTPSecret();">
+        <label>
+          Your Name:<br>
+          <input type="text" id="user1" required style="width:100%;">
+        </label><br><br>
+        <label>
+          Friend Name:<br>
+          <input type="text" id="user2" required style="width:100%;">
+        </label><br><br>
+        <button type="submit">Generate TOTP Secret</button>
+      </form>
+      <div id="totpResult" style="margin-top:1em; word-break:break-all;"></div>
+    </div>
+  </div>
+  <div id="cheatSheet"></div>
+  <script>
+    const alphabet = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'; // Exclude confusing chars
+
+    function generateCode(length) {
+      let code = '';
+      for (let i = 0; i < length; i++) {
+        code += alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+      return code;
+    }
+
+    function generateMatrix(rows, columns, codeLength) {
+      const seen = new Set();
+      const matrix = [];
+      for (let r = 0; r < rows; r++) {
+        const row = [];
+        for (let c = 0; c < columns; c++) {
+          let code = generateCode(codeLength);
+          while (seen.has(code)) {
+            code = generateCode(codeLength);
+          }
+          seen.add(code);
+          row.push(code);
+        }
+        matrix.push(row);
+      }
+      return matrix;
+    }
+
+    function renderTable(matrix) {
+      const columns = matrix[0].length;
+      let html = '<table><tr><th class="row-label"></th>';
+      for (let c = 0; c < columns; c++) {
+        html += `<th>${c + 1}</th>`;
+      }
+      html += '</tr>';
+      for (let r = 0; r < matrix.length; r++) {
+        html += `<tr><td class="row-label">${String.fromCharCode(65 + r)}</td>`;
+        for (let c = 0; c < columns; c++) {
+          html += `<td>${matrix[r][c]}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</table>';
+      return html;
+    }
+
+    function generateSheet() {
+      const columns = parseInt(document.getElementById('columns').value, 10);
+      const rows = parseInt(document.getElementById('rows').value, 10);
+      const codeLength = parseInt(document.getElementById('codeLength').value, 10);
+      const matrix = generateMatrix(rows, columns, codeLength);
+      document.getElementById('cheatSheet').innerHTML = renderTable(matrix);
+    }
+
+    function downloadAsHTML() {
+      // Save the current state of the page, but remove all .download-btn buttons and all .controls (generate options) from the HTML before saving.
+
+      const style = document.querySelector('style').outerHTML;
+      // Clone the body so we can safely remove elements
+      const bodyClone = document.body.cloneNode(true);
+      // Remove all elements with class 'download-btn'
+      bodyClone.querySelectorAll('.download-btn').forEach(btn => btn.remove());
+      // Remove the entire controls section (generate options)
+      bodyClone.querySelectorAll('.controls').forEach(ctrl => ctrl.remove());
+      const body = bodyClone.outerHTML;
+
+      const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CodeKeySheet Codes Cheat Sheet (Static JS)</title>
+  ${style}
+</head>
+${body}
+      `.trim();
+
+      const blob = new Blob([html], {type: "text/html"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "CodeKeySheet_Codes_Cheat_Sheet.html";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    // TOTP Secret Generation
+    function showTOTPDialog() {
+      document.getElementById('totpDialog').style.display = 'block';
+      document.getElementById('totpForm').reset();
+      document.getElementById('totpResult').innerHTML = '';
+    }
+    function closeTOTPDialog() {
+      document.getElementById('totpDialog').style.display = 'none';
+    }
+    function generateTOTPSecret() {
+      // Generate a 20-byte base32 secret
+      const base32chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      let secret = "";
+      for (let i = 0; i < 32; i++) {
+        secret += base32chars.charAt(Math.floor(Math.random() * base32chars.length));
+      }
+      const user1 = document.getElementById('user1').value.trim();
+      const user2 = document.getElementById('user2').value.trim();
+      const label = encodeURIComponent(`${user1} - ${user2}`);
+      const otpauth = `otpauth://totp/${label}?secret=${secret}&issuer=CodeKeySheet`;
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(otpauth)}`;
+      document.getElementById('totpResult').innerHTML = `
+        <strong>Secret (Base32):</strong><br>
+        <code>${secret}</code><br><br>
+        <strong>otpauth URL:</strong><br>
+        <code style="font-size:0.9em;">${otpauth}</code><br><br>
+        <strong>Scan QR with Google Authenticator:</strong><br>
+        <img src="${qrUrl}" alt="TOTP QR Code"><br>
+        <small>Label: ${user1} - ${user2}</small>
+      `;
+    }
+
+    // Generate initial sheet on load
+    window.onload = generateSheet;
+  </script>
+</body>
+</html>
